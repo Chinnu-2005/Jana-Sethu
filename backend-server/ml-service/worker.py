@@ -17,7 +17,18 @@ MONGO_URI = os.getenv('DB_URI', 'mongodb://localhost:27017/CivicResponses')
 ML_SERVICE_URL = os.getenv('ML_SERVICE_URL', 'http://localhost:8000')
 
 # Initialize connections
-redis_client = redis.from_url(REDIS_URL)
+# Initialize connections
+# Handle Redis SSL
+if 'upstash.io' in REDIS_URL and REDIS_URL.startswith('redis://'):
+    print('🔒 Upgrading Upstash URL to rediss://')
+    REDIS_URL = REDIS_URL.replace('redis://', 'rediss://')
+
+redis_options = {}
+if REDIS_URL.startswith('rediss://'):
+    redis_options['ssl_cert_reqs'] = None
+
+# Cast to standard Redis client to fix type hint confusion
+redis_client: redis.Redis = redis.from_url(REDIS_URL, **redis_options)
 mongo_client = pymongo.MongoClient(MONGO_URI)
 db = mongo_client.get_database()
 
@@ -117,7 +128,8 @@ def process_classification_job(job_data):
             
             # Notify Node.js server about classification completion
             try:
-                webhook_url = os.getenv('NODEJS_WEBHOOK_URL', 'http://localhost:3000/api/v1/reports/ml-webhook')
+                # Use Render internal DNS for service-to-service communication
+                webhook_url = os.getenv('NODEJS_WEBHOOK_URL', 'http://civic-reports-api:10000/api/v1/reports/ml-webhook')
                 
                 # Convert MongoDB document to JSON serializable format
                 serializable_report = None
@@ -161,10 +173,20 @@ def worker_loop():
     print(f"MongoDB URI: {MONGO_URI}")
     print(f"ML Service URL: {ML_SERVICE_URL}")
     
+    # Test Redis Connection
+    try:
+        print("Testing Redis connection...")
+        redis_client.ping()
+        print("✅ Redis connection successful!")
+        print(f"Waiting for jobs on queue: 'ml_classification_queue'")
+    except Exception as redis_e:
+        print(f"❌ Redis connection FAILED: {str(redis_e)}")
+        print("Worker cannot function without Redis. Retrying in loop...")
+    
     while True:
         try:
             # Check for jobs in Redis queue
-            job_data = redis_client.blpop('ml_classification_queue', timeout=5)
+            job_data = redis_client.blpop(['ml_classification_queue'], timeout=5)
             
             if job_data:
                 print(f"Received job: {job_data}")

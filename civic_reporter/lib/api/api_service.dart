@@ -59,24 +59,24 @@ class ApiService {
       http.Response response;
       switch (method.toUpperCase()) {
         case 'GET':
-          response = await http.get(url, headers: headers).timeout(const Duration(seconds: 30));
+          response = await http.get(url, headers: headers).timeout(const Duration(seconds: 60));
           break;
         case 'POST':
           response = await http.post(
             url,
             headers: headers,
             body: body != null ? jsonEncode(body) : null,
-          ).timeout(const Duration(seconds: 30));
+          ).timeout(const Duration(seconds: 60));
           break;
         case 'PATCH':
           response = await http.patch(
             url,
             headers: headers,
             body: body != null ? jsonEncode(body) : null,
-          ).timeout(const Duration(seconds: 30));
+          ).timeout(const Duration(seconds: 60));
           break;
         case 'DELETE':
-          response = await http.delete(url, headers: headers).timeout(const Duration(seconds: 30));
+          response = await http.delete(url, headers: headers).timeout(const Duration(seconds: 60));
           break;
         default:
           throw Exception('Unsupported HTTP method: $method');
@@ -197,6 +197,7 @@ class ApiService {
       request.fields.addAll({
         'title': title,
         'description': description,
+        'category': category, // ensure category is passed
         'latitude': latitude.toString(),
         'longitude': longitude.toString(),
         'address': address,
@@ -220,7 +221,7 @@ class ApiService {
         ));
       }
 
-      final response = await request.send();
+      final response = await request.send().timeout(const Duration(seconds: 120));
       final responseBody = await response.stream.bytesToString();
       
       return _handleResponse(http.Response(responseBody, response.statusCode));
@@ -230,11 +231,63 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> getAllReports() async {
-    return await _makeRequest('GET', ApiConfig.getAllReports, requiresAuth: false);
+    try {
+      final response = await _makeRequest('GET', ApiConfig.getAllReports, requiresAuth: false);
+      
+      // Cache the response
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('cached_all_reports', jsonEncode(response));
+      } catch (e) {
+        print('Failed to cache all reports: $e');
+      }
+      
+      return response;
+    } catch (e) {
+      print('Network error fetching all reports: $e');
+      // Try to load from cache
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final cachedData = prefs.getString('cached_all_reports');
+        if (cachedData != null) {
+          print('📦 Loaded all reports from cache');
+          return jsonDecode(cachedData);
+        }
+      } catch (cacheError) {
+        print('Cache error: $cacheError');
+      }
+      rethrow; // Rethrow original error if no cache
+    }
   }
 
   Future<Map<String, dynamic>> getUserReports() async {
-    return await _makeRequest('GET', ApiConfig.getUserReports, requiresAuth: true);
+    try {
+      final response = await _makeRequest('GET', ApiConfig.getUserReports, requiresAuth: true);
+      
+      // Cache the response
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('cached_user_reports', jsonEncode(response));
+      } catch (e) {
+        print('Failed to cache user reports: $e');
+      }
+      
+      return response;
+    } catch (e) {
+      print('Network error fetching user reports: $e');
+      // Try to load from cache
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final cachedData = prefs.getString('cached_user_reports');
+        if (cachedData != null) {
+          print('📦 Loaded user reports from cache');
+          return jsonDecode(cachedData);
+        }
+      } catch (cacheError) {
+        print('Cache error: $cacheError');
+      }
+      rethrow;
+    }
   }
 
   Future<Map<String, dynamic>> getNearbyReports({

@@ -1,6 +1,6 @@
 class ApiConfig {
-  // Use ngrok URL for permanent access across networks
-  static const String baseUrl = 'https://781d0d6b4c3b.ngrok-free.app/api/v1';
+  // Use production URL
+  static const String baseUrl = 'https://civic-reports-api.onrender.com/api/v1';
 
   // Auth endpoints
   static const String register = '/auth/register';

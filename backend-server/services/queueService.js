@@ -2,8 +2,16 @@ const Queue = require('bull');
 const redis = require('redis');
 
 // Create Redis connection
+const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+const isUpstash = redisUrl.includes('upstash.io');
+const isSecure = redisUrl.startsWith('rediss://');
+
 const redisClient = redis.createClient({
-  url: process.env.REDIS_URL || 'redis://localhost:6379'
+  url: redisUrl,
+  socket: {
+    tls: isUpstash || isSecure,
+    rejectUnauthorized: false
+  }
 });
 
 redisClient.on('error', (err) => {

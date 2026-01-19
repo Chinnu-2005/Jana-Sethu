@@ -2,8 +2,22 @@ const redis = require('redis');
 
 class MLService {
   constructor() {
+    let redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+    
+    // Auto-fix Upstash URLs to use secure protocol
+    if (redisUrl.includes('upstash.io') && redisUrl.startsWith('redis://')) {
+      console.log('🔒 Upgrading Upstash URL to rediss://');
+      redisUrl = redisUrl.replace('redis://', 'rediss://');
+    }
+    
+    const isSecure = redisUrl.startsWith('rediss://');
+
     this.redisClient = redis.createClient({
-      url: process.env.REDIS_URL || 'redis://localhost:6379'
+      url: redisUrl,
+      socket: {
+        tls: isSecure, // Only enable TLS if protocol is rediss://
+        rejectUnauthorized: false
+      }
     });
     
     this.redisClient.on('error', (err) => {
@@ -25,6 +39,12 @@ class MLService {
 
   async queueClassificationJob(reportData) {
     try {
+      // Ensure connection is open before pushing
+      if (!this.redisClient.isOpen) {
+        console.log('Redis client not open, attempting to connect...');
+        await this.redisClient.connect();
+      }
+
       const job = {
         reportId: reportData._id.toString(),
         description: reportData.description || '',
