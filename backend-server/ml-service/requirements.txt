@@ -1,12 +1,10 @@
 fastapi
 uvicorn
-torch
-torchvision
-transformers
-pillow
+google-generativeai
+python-dotenv
+python-multipart
 requests
+pillow
 pydantic
 pymongo
-librosa
-numpy
-python-multipart
+redis

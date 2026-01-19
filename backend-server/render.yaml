@@ -24,7 +24,16 @@ services:
     env: python
     plan: starter
     buildCommand: pip install -r ml-service/requirements.txt
-    startCommand: cd ml-service && python app.py
+    startCommand: cd ml-service && chmod +x render_start.sh && ./render_start.sh
     envVars:
       - key: PORT
         value: 8000
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: civic-reports-redis
+          property: connectionString
+      - key: NODEJS_WEBHOOK_URL
+        value: http://civic-reports-api:10000/api/v1/reports/ml-webhook

@@ -1,4 +1,4 @@
-const admin = require("../config/firebase");
+//const admin = require("../config/firebase");
 const User = require("../models/User");
 const generateTokens = require("../utils/jwt");
 const jwt = require("jsonwebtoken");
@@ -145,6 +145,8 @@ const login = async (req, res) => {
 
 // Firebase authentication
 const firebaseAuth = async (req, res) => {
+  return res.status(501).json({ error: "Firebase authentication is disabled." });
+  /*
   try {
     const { idToken, name, mobile } = req.body;
 
@@ -200,6 +202,7 @@ const firebaseAuth = async (req, res) => {
     console.error("Firebase auth error:", error);
     res.status(401).json({ error: "Invalid Firebase token" });
   }
+  */
 };
 
 // Refresh token
